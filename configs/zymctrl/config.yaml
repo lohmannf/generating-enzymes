@@ -1,0 +1,48 @@
+model:
+#GPT2Config goes here
+
+training:
+  n_epochs: 1
+  freeze: false
+  train_batch_size: 1
+  eval_batch_size: 4
+  log_freq: 5
+  eval_freq: 10
+  snapshot_freq: 500
+  snapshot_limit: 2
+  cache_dir: "."
+  ckpt: null
+  ckpt_dir: null
+  sample: true
+
+  snapshot_sampling:
+    freq: 100
+    batch_size: 20
+    output_file: ${..training.work_dir}/train_generation.fasta
+    prompt: 1.5.1.-
+    kwargs: ${..generation.kwargs}
+
+
+  use_wandb: true
+  wandb:
+    project: zymctrl
+
+  optimizer:
+    lr: 8e-05
+
+  work_dir: /cluster/project/krause/flohmann/zymctrl/f_${..training.freeze}_lr_${..training.optimizer.lr}
+
+generation:
+  prompts:
+    - 1.5.1.-
+  n_seqs: 10000
+  batch_size: 20
+  output_file: ${..training.work_dir}/zymctrl_f_${..training.freeze}_lr_${..training.optimizer.lr}.fasta
+  keep_in_memory: false
+  kwargs:
+    top_k: 9
+    repetition_penalty': 1.2
+    max_length': 1024
+    eos_token_id: 1
+    pad_token_id: 0
+    do_sample: true 

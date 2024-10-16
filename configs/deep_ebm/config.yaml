@@ -1,0 +1,46 @@
+model:
+  L: 290
+  d: 20
+  mode: pseudolh
+  seed: 31
+  energy_model:
+    name: esm
+    path: /cluster/project/krause/flohmann/esm2_t12_35M_UR50D
+
+training:
+  n_steps: 100000
+  n_epochs: null
+  batch_size: 32 # effective batch size is batch_size*20
+  log_freq: 32
+  eval_freq: 50
+  snapshot_freq: 50
+  freeze: true
+  chunk_sz: 3 # number seq positions handled in the same chunk
+
+  optimizer:
+    lr: 8e-5
+    beta1: 0
+    beta2: 0.999
+    gamma: 1.  #scheduler gamma
+    decay: 0.01
+    accum: 16
+    grad_clip: 1.
+
+  use_wandb: true
+  wandb:
+    project: deep-ebm
+
+  work_dir: /cluster/project/krause/flohmann/deep_ebm_f_${..training.freeze}_lr_${..training.optimizer.lr}_acc_${..training.optimizer.accum}/
+
+generation:
+  seed: ${..model.seed}
+  sampler: local
+  temp_proposal: 2.
+  temp_marginal: 1.
+  n_episodes: 10000
+  n_burnin: 10000 
+  batch_size: 100 # batch size for writing to disk
+  keep_in_memory: true
+  output_file: ${..training.work_dir}/deep_ebm.fasta
+
+

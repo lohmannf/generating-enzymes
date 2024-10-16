@@ -1,2 +1,10 @@
 pandas
 mavenn
+ipykernel
+torch
+datasets
+mutedpy
+moviepy
+transformers
+pytorch-minimize
+blosum

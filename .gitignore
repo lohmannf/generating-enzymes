@@ -1,2 +1,10 @@
-*/__pycache__
+*__pycache__*
 .DS_Store
+enz_venv
+*slurm*
+data
+eval_plots
+gen_data
+datasets
+datasets_unlabelled
+wandb

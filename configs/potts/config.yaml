@@ -1,0 +1,45 @@
+model:
+  L: 290
+  d: 20
+  lambda_J: 0.01
+  lambda_h: 0.01
+  seed: 31
+  max_energy: null #clamp energy
+
+training:
+  alpha: 0.01
+  n_epochs: 5000
+  batch_size: 32 # effective batch size is batch_size*20
+  log_freq: 5 #epochs
+  contact_map_snapshot_freq: 500
+
+  optimizer:
+    method: adam
+    # parameters for adam
+    lr: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    gamma: 0.99  #scheduler gamma
+    lr_limit: 0.001
+
+    # parameters for l-bfgs
+    history_size: 15
+
+  use_wandb: true
+  wandb:
+    project: potts
+
+  work_dir: /cluster/project/krause/flohmann/potts_${..training.freeze}_lr_${..training.optimizer.lr}_acc_${..training.optimizer.accum}/
+
+
+
+generation:
+  seed: ${..model.seed}
+  sampler: local
+  temp_proposal: 2.
+  temp_marginal: 0.01
+  n_episodes: 10000
+  n_burnin: 10000 
+  batch_size: 100 # batch size for writing to disk
+  keep_in_memory: true
+  output_file: ${..training.work_dir}/potts.fasta

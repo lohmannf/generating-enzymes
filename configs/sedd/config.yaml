@@ -1,0 +1,64 @@
+ngpus: 2
+tokens: 21
+
+model: small
+
+wandb:
+  entity: flohmann
+  project: sedd
+
+training:
+  loss: dwdse
+  distributed: true
+  batch_size: 16 #16
+  accum: 1
+  n_iters: 4000 #1300001
+  snapshot_freq: 5000
+  log_freq: 10
+  eval_freq: 50
+  snapshot_freq_for_preemption: 10000
+  weight: standard
+  snapshot_sampling: False
+  ema: 0.9999
+
+data:
+  test_split: 0.2
+  grouped: true
+  train: protein
+  valid: protein
+  name: ired
+  cache_dir: data
+
+graph:
+  type: absorb
+  file: data
+  report_all: False
+
+noise:
+  type: loglinear
+  sigma_min: 1e-4
+  sigma_max: 20
+
+sampling:
+  predictor: euler
+  steps: 1000
+  noise_removal: True
+  batch_size: 16
+  n_batch: 10
+
+eval:
+  batch_size: 16 #16
+  perplexity: False
+  perplexity_batch_size: 32
+
+optim:
+  weight_decay: 0
+  optimizer: AdamW
+  lr: 3e-4
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1e-8
+  warmup: 2500
+  grad_clip: 1.
+
+work_dir: /cluster/project/krause/flohmann/sedd/${data.name}/${now:%Y.%m.%d}/${now:%H:%M:%S}
