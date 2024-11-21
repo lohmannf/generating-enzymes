@@ -3,10 +3,10 @@ import os
 from tqdm import tqdm
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
-from src.evaluation.evaluator import Evaluator
-from src.evaluation.similarity import SimilarityStats
-from src.data.loader import DataLoader
-from src.evaluation.tvd import total_variation_distance
+from genzyme.evaluation.evaluator import Evaluator
+from genzyme.evaluation.similarity import SimilarityStats
+from genzyme.data import DataLoader
+from genzyme.evaluation.tvd import total_variation_distance
 
 def pad_integers(raw_ints):
     ''' 

@@ -6,20 +6,21 @@ import matplotlib.pyplot as plt
 import os
 from omegaconf import OmegaConf, DictConfig
 
-from src.models.basemodel import BaseModel
-from src.models.ebm import EnergyBasedModel
+from genzyme.models.basemodel import BaseModel
+from genzyme.models.ebm import EnergyBasedModel
+from genzyme.data.utils import aa2int_single
 
 
 class PottsModel(EnergyBasedModel, BaseModel):
 
-    def __init__(self, model_cfg: DictConfig):
+    def __init__(self, cfg: DictConfig):
 
-        super().__init__(model_cfg.L, model_cfg.d, model_cfg.seed)
+        super().__init__(cfg.model.L, cfg.model.d, cfg.model.seed)
 
-        self.max_energy=model_cfg.max_energy
+        self.max_energy=cfg.model.max_energy
         self.n = 0
-        self.lambda_J = model_cfg.lambda_J * (self.L - 1) * self.d
-        self.lambda_h = model_cfg.lambda_h
+        self.lambda_J = cfg.model.lambda_J * (self.L - 1) * self.d
+        self.lambda_h = cfg.model.lambda_h
         # Initialize J and h randomly
         self.J =  torch.nn.Parameter(torch.randn(self.L, self.L, self.d, self.d).double(), True)
         self.h =  torch.nn.Parameter(torch.randn(self.L, self.d).double(), True)
@@ -137,48 +138,56 @@ class PottsModel(EnergyBasedModel, BaseModel):
         return corrected_scores.detach()
      
 
-    def run_training(self, train_data, test_data, train_cfg: DictConfig):
+    def run_training(self, train_data, test_data, cfg: DictConfig):
         """
         Train the model using either quadratic programming or SGD
         """
 
-        if train_cfg.optimizer.method == "l-bfgs":
+        if not os.path.exists(cfg.training.work_dir):
+            os.mkdir(cfg.training.work_dir)
+            os.mkdir(os.path.join(cfg.training.work_dir, "snapshots"))
+
+        OmegaConf.save(os.path.join(cfg.training.work_dir, "config.yaml"), resolve=True)
+
+        if cfg.training.optimizer.method == "l-bfgs":
             params = torch.randn(size = (self.L, self.L + 1, self.d, self.d)).double()
             self.x = next(iter(train_data))
             self.x.requires_grad = False
             self.weight = torch.ones(self.x.size()[0], requires_grad = False)
 
-            it = 0
+            #it = 0
             def cbk(x):
-                nonlocal it
-                it += 1
-                print(f"Iteration {it} finished", flush=True)
+                #nonlocal it
+                #it += 1
+                #print(f"Iteration {it} finished", flush=True)
+                print(" ", flush=True) # force flushing of intermediate results
 
 
             result = minimize(self.pseudo_lh_param,
                             params,
                             method='l-bfgs', 
-                            disp=2, 
-                            options={"history_size": train_cfg.optimizer.history_size},
+                            disp=2,
+                            max_iter = cfg.training.optimizer.max_iter,
+                            options={"history_size": cfg.training.optimizer.history_size},
                             callback = cbk)
 
             params = result.x
             self.J = torch.nn.Parameter(params[:, 0:self.L, :, :], False)
             self.h = torch.nn.Parameter(params[:, self.L, 0, :], False)
 
-        elif train_cfg.optimizer.method == "adam":
+        elif cfg.training.optimizer.method == "adam":
             
-            if train_cfg.use_wandb:
-                run = wandb.init(**OmegaConf.to_object(train_cfg.wandb))
+            if cfg.training.use_wandb:
+                run = wandb.init(**OmegaConf.to_object(cfg.training.wandb))
 
-            optimizer = torch.optim.Adam(self.parameters(), lr = train_cfg.optimizer.lr, 
-                                         betas = (train_cfg.optimizer.beta1, train_cfg.optimizer.beta2))
-            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=train_cfg.optimizer.gamma)
+            optimizer = torch.optim.Adam(self.parameters(), lr = cfg.training.optimizer.lr, 
+                                         betas = (cfg.training.optimizer.beta1, cfg.training.optimizer.beta2))
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=cfg.training.optimizer.gamma)
 
             step = 0
 
             try:
-                for i in range(train_cfg.n_epochs):
+                for i in range(cfg.training.n_epochs):
 
                     epoch_loss = 0
 
@@ -191,12 +200,12 @@ class PottsModel(EnergyBasedModel, BaseModel):
                         step += 1
                         epoch_loss += loss.item()
 
-                    if scheduler.get_last_lr()[0] > train_cfg.optimizer.lr_limit:
+                    if scheduler.get_last_lr()[0] > cfg.training.optimizer.lr_limit:
                         scheduler.step()
 
                     epoch_loss /= len(train_data)
 
-                    if (i) % train_cfg.log_freq == 0:
+                    if (i) % cfg.training.log_freq == 0:
 
                         test_loss = 0  # will be lower than training loss because we calculate it after optim step
                         
@@ -205,11 +214,11 @@ class PottsModel(EnergyBasedModel, BaseModel):
                                 test_loss += self.pseudo_lh(batch.to(self.device)).item()
                             
                         test_loss /= len(test_data)
-                        if train_cfg.use_wandb:
+                        if cfg.training.use_wandb:
                             run.log({"epoch": i+1, "train_step": step, "training/loss": epoch_loss, "evaluation/loss": test_loss, "lr": scheduler.get_last_lr()[0]})
                         print({"epoch": i+1, "train_step": step, "training/loss": epoch_loss, "evaluation/loss": test_loss, "lr": scheduler.get_last_lr()[0]}, flush=True)
                     
-                    if (i) % train_cfg.contact_map_snapshot_freq == 0:
+                    if (i) % cfg.training.contact_map_snapshot_freq == 0:
                         
                         with torch.no_grad():
                             cm = self.get_coupling_info(apc=True)
@@ -217,15 +226,16 @@ class PottsModel(EnergyBasedModel, BaseModel):
                         fig, ax = plt.subplots()
                         ax.imshow(cm.cpu().detach().numpy())
                         ax.set_title(f"Epoch {i+1} Train step {step}")
-                        plt.savefig(os.path.join(train_cfg.work_dir, f"cm_snapshots/step_{step}.png"), dpi=500)
+                        plt.savefig(os.path.join(cfg.training.work_dir, f"snapshots/step_{step}.png"), dpi=500)
                         plt.close()
 
-                        
-
             finally:
-                if train_cfg.use_wandb:
+                if cfg.training.use_wandb:
                     wandb.finish()
         
+        torch.save(self, os.path.join(cfg.training.work_dir, "model.pt"))
+        
+
 
     def forward(self, seqs: torch.Tensor, w: torch.Tensor = None):
         ''' 
@@ -261,3 +271,59 @@ class PottsModel(EnergyBasedModel, BaseModel):
             torch.clamp(nenergy, max = None, min = -self.max_energy)
         
         return nenergy
+
+
+if __name__ == "__main__":
+
+    from genzyme.models import modelFactory
+    from genzyme.data import loaderFactory
+
+    loader = loaderFactory("potts")
+    loader.load("mid1")
+    
+    # L = len(loader.get_data()[0])
+
+    cfg = OmegaConf.load("/cluster/home/flohmann/generating-enzymes/configs/potts/config.yaml")
+    cfg.training.optimizer.method="l-bfgs"
+    cfg.training.optimizer.history_size = 20
+    cfg.training.test_split = 0.001
+
+    cfg.model.L = 97
+    # train_data, test_data = loader.preprocess(cfg.training.test_split, train_batch_size=int(np.ceil((1-cfg.training.test_split)*loader.length)), 
+    #                                           test_batch_size=cfg.training.batch_size, d = 20, shuffle=True)
+    
+    # model = modelFactory("potts", cfg = cfg)
+    # model.run_training(train_data, test_data, cfg.training)
+
+    # torch.save(model, "potts_mid1.pt")
+
+    model = torch.load("potts_mid1.pt", map_location="cpu")
+
+    contacts = model.get_coupling_info(apc=True)
+    
+    fig, ax = plt.subplots()
+    ax.imshow(contacts)
+    plt.show()
+    plt.savefig("potts_contacts.png", dpi=500)
+    plt.close()
+
+    model.projector = lambda x, is_onehot = True: x
+
+    x0_p = np.random.choice(loader.get_data())
+    x0_p = torch.tensor(aa2int_single(x0_p)).unsqueeze(0)
+    x0_p = torch.nn.functional.one_hot(x0_p, num_classes = model.d).double()
+    
+    sampler = "local"
+    seed = 31
+
+    model.set_seed(seed)
+
+    cfg.generation.temp_marginal = 0.01
+    cfg.generation.n_episodes = 10000
+    cfg.generation.n_burnin = 10000
+    cfg.generation.sampler = sampler
+    cfg.generation.output_file = f"./gen_data/mid1/potts/frozen_seed_{cfg.generation.seed}_{cfg.generation.sampler}_T_{cfg.generation.temp_marginal}.fasta"
+    print(cfg)
+
+    model.generate(cfg, x0_p)
+

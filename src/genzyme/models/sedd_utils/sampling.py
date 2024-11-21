@@ -1,9 +1,9 @@
 import abc
 import torch
 import torch.nn.functional as F
-from src.models.sedd_utils.catsample import sample_categorical
 
-from src.models.sedd_utils.model import utils as mutils
+from genzyme.models.sedd_utils.catsample import sample_categorical
+from genzyme.models.sedd_utils.model import utils as mutils
 
 _PREDICTORS = {}
 

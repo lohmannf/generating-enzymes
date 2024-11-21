@@ -6,9 +6,10 @@ import os
 from cycler import cycler
 import matplotlib.pyplot as plt
 import umap
+from tqdm import tqdm
 
-from src.data.loader import loaderFactory
-from src.evaluation.similarity import SimilarityStats
+from genzyme.data import loaderFactory
+from genzyme.evaluation.similarity import SimilarityStats
 
 class ESM:
     # Get ESM-2 Embeddings for protein sequences
@@ -368,26 +369,62 @@ if __name__ == "__main__":
     "random": "./gen_data/random.fasta",
     }
 
+    res_dirs = {
+            "sedd": "./gen_data/mid1/sedd/mid1.fasta",
+            #"dfm": "./gen_data/mid1/dfm/mid1.fasta",
+            "frozen": "./gen_data/mid1/zymctrl/frozen.fasta",
+            "pretrained": "./gen_data/mid1/zymctrl/zymctrl_pretrained.fasta",
+            "ft lr 8e-05": "./gen_data/mid1/zymctrl/zymctrl_lr_8e-05.fasta",
+            "deep ebm T=1": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_1.fasta",
+            "deep ebm T=5": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_5.fasta",
+            "deep ebm T=10": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_10.fasta",
+            #"potts gwg T=0.01": "./gen_data/mid1/potts/frozen_seed_31_local_T_0.01.fasta",
+            #"potts gwg T=1": "./gen_data/mid1/potts/frozen_seed_31_local_T_1.fasta",
+            "random": "./gen_data/mid1/random/random_uninformed.fasta",
+            #"random informed": "./gen_data/mid1/random/random_informed.fasta",
+    }
+
+    model_dirs = {
+        "deep ebm": "/cluster/project/krause/flohmann/deep_ebm_f_True_lr_0.001_acc_16_mid1",
+        "potts": "/cluster/home/flohmann/generating-enzymes/potts_mid1.pt"
+    }
+
+    from genzyme.models import modelFactory
+    from omegaconf import OmegaConf
+    from genzyme.data.utils import aa2int
+
+    potts = torch.load(model_dirs["potts"])
+    debm = modelFactory("debm", cfg = OmegaConf.load("./configs/deep_ebm/config.yaml"))
+    debm.load_ckpt(model_dirs["deep ebm"])
+
+    n_per_dataset = 600
+    l = 97
+    seed = 7
+    sim_metric = "one-hot"
+
     seqs = []
     labs = []
-    n_per_dataset = 600
-    l = 290
+
+    np.random.seed(seed)
+
     for i, path in enumerate(res_dirs.values()):
         print(path, flush=True)
         with open(path, "r") as file:
-            lines = [s.strip().replace("[UNK]", "") for s in file.readlines() if not s.startswith('>')]
+            lines = [s.strip().replace("[UNK]", "").replace("X", "") for s in file.readlines() if not s.startswith('>')]
             lines = np.unique([''.join([pos for pos in seq if not pos.isdigit()]) for seq in lines])
         
         lines = np.unique([x[:l] for x in lines if len(x) >= l])
 
         if len(lines) > n_per_dataset:
             lines = np.random.choice(lines, n_per_dataset, replace=False)
+
         seqs.extend(lines)
         labs.extend(len(lines)* [i])
 
     train_dat = loaderFactory()
-    train_dat.load('ired')
-    train_dat._replace("*")
+    # train_dat.load('ired')
+    # train_dat._replace("*")
+    train_dat.load("mid1")
 
     lines = train_dat.get_data()[np.random.choice(len(lines), n_per_dataset, replace=False)]
     labs.extend([i+1]*len(lines))
@@ -396,8 +433,8 @@ if __name__ == "__main__":
     gen_dat = loaderFactory()
     gen_dat.set_data(np.array(seqs))
 
-    sim_stats = SimilarityStats(train_dat, gen_dat)
-    fitness, similarity = sim_stats.map_property_to_gen("fitness", "one-hot")
+    # sim_stats = SimilarityStats(train_dat, gen_dat)
+    # fitness, similarity = sim_stats.map_property_to_gen("fitness", sim_metric)
     
     embs = ESM()
     embeddings, nll, ppl = embs.get_embeddings(seqs)
@@ -411,45 +448,83 @@ if __name__ == "__main__":
     print(avg_nll)
     print(avg_ppl)
 
+    seqs_oh_p = torch.nn.functional.one_hot(torch.from_numpy(aa2int(seqs)), num_classes=20).double()
+    seqs_int_em = torch.concat([debm.em_tokenizer.encode(x, return_tensors="pt") for x in seqs], dim=0)
+
+    batch_size=50
+    debm_energy = np.empty((0,))
+    potts_energy = np.empty((0,))
+    with torch.no_grad():
+        for batch_em, batch_p in tqdm(zip(torch.split(seqs_int_em, batch_size, dim=0), torch.split(seqs_oh_p, batch_size, dim=0))):
+            debm_energy = np.concatenate([debm_energy, debm(batch_em.to(debm.device)).cpu().squeeze().numpy()])
+            potts_energy = np.concatenate([potts_energy, potts(batch_p.to(potts.device)).cpu().numpy()])
+    
+    debm_energy *= -1
+    potts_energy *= -1
 
     stats = EmbeddingStats(np.array(labs), np.array(embeddings), label_names = list(res_dirs.keys())+["train data"])
     print(stats.silhouette())
 
-    _, ax = stats.plot_embeddings(color = fitness, col_name = "fitness")
-    ax.set_title('ESM-2 embeddings')
+    # _, ax = stats.plot_embeddings(color = fitness, col_name = "fitness")
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_fitness.png", dpi=500)
+    # plt.close()
+
+    # _, ax = stats.plot_embeddings(color = fitness, col_name = "fitness", umap=True)
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_umap_fitness.png", dpi=500)
+    # plt.close()
+
+    # _, ax = stats.plot_embeddings(color = similarity, col_name = "similarity")
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_similarity.png", dpi=500)
+    # plt.close()
+
+    # _, ax = stats.plot_embeddings(color = similarity, col_name = "similarity", umap=True)
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_umap_similarity.png", dpi=500)
+    # plt.close()
+
+    # _, ax = stats.plot_embeddings(color = np.log(similarity), col_name = "log(similarity)")
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_log_similarity.png", dpi=500)
+    # plt.close()
+
+    # _, ax = stats.plot_embeddings(color = np.log(similarity), col_name = "log(similarity)", umap=True)
+    # ax.set_title('ESM-2 embeddings')
+    # plt.show()
+    # plt.savefig("embeddings_umap_log_similarity.png", dpi=500)
+    # plt.close()
+
+    _, ax = stats.plot_embeddings(color = debm_energy, col_name = "energy")
+    ax.set_title('Deep EBM Energy')
     plt.show()
-    plt.savefig("embeddings_fitness.png", dpi=500)
+    plt.savefig("embeddings_debm.png", dpi=500)
     plt.close()
 
-    _, ax = stats.plot_embeddings(color = fitness, col_name = "fitness", umap=True)
-    ax.set_title('ESM-2 embeddings')
+    _, ax = stats.plot_embeddings(color = debm_energy, col_name = "energy", umap=True)
+    ax.set_title('Deep EBM Energy')
     plt.show()
-    plt.savefig("embeddings_umap_fitness.png", dpi=500)
+    plt.savefig("embeddings_debm_umap.png", dpi=500)
     plt.close()
 
-    _, ax = stats.plot_embeddings(color = similarity, col_name = "similarity")
-    ax.set_title('ESM-2 embeddings')
+    _, ax = stats.plot_embeddings(color = potts_energy, col_name = "energy")
+    ax.set_title('Potts Model Energy')
     plt.show()
-    plt.savefig("embeddings_similarity.png", dpi=500)
+    plt.savefig("embeddings_potts.png", dpi=500)
     plt.close()
 
-    _, ax = stats.plot_embeddings(color = similarity, col_name = "similarity", umap=True)
-    ax.set_title('ESM-2 embeddings')
+    _, ax = stats.plot_embeddings(color = potts_energy, col_name = "energy", umap=True)
+    ax.set_title('Potts Energy')
     plt.show()
-    plt.savefig("embeddings_umap_similarity.png", dpi=500)
+    plt.savefig("embeddings_potts_umap.png", dpi=500)
     plt.close()
 
-    _, ax = stats.plot_embeddings(color = np.log(similarity), col_name = "log(similarity)")
-    ax.set_title('ESM-2 embeddings')
-    plt.show()
-    plt.savefig("embeddings_log_similarity.png", dpi=500)
-    plt.close()
-
-    _, ax = stats.plot_embeddings(color = np.log(similarity), col_name = "log(similarity)", umap=True)
-    ax.set_title('ESM-2 embeddings')
-    plt.show()
-    plt.savefig("embeddings_umap_log_similarity.png", dpi=500)
-    plt.close()
 
     _, ax = stats.plot_embeddings(color = ppl, col_name = "perplexity")
     ax.set_title('ESM-2 embeddings')

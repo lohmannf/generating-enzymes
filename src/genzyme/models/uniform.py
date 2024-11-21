@@ -3,8 +3,8 @@ import pandas as pd
 from tqdm import tqdm
 import os
 
-from src.models.basemodel import BaseModel
-from src.data.utils import AA_DICT
+from genzyme.models.basemodel import BaseModel
+from genzyme.data.utils import AA_DICT
 
 class UniformRandomModel(BaseModel):
     ''' 
@@ -19,7 +19,7 @@ class UniformRandomModel(BaseModel):
         np.random.seed(seed)
 
         self.rng = np.random.default_rng()
-        self.frequency = np.ones((290, len(AA_DICT)))/len(AA_DICT)
+        self.frequency = np.ones((length, len(AA_DICT)))/len(AA_DICT)
         self.freq_idx = np.array(list(AA_DICT.keys()))
 
     def pad_data(self, data: np.ndarray):
@@ -34,7 +34,7 @@ class UniformRandomModel(BaseModel):
     def run_training(self,
         train_dataset: str | np.ndarray, length: int):
         '''
-        Learn the empirical distribution of each position in the sequence
+        Learn the empirical marginal distribution of each position in the sequence
 
         Parameters
         ----------
@@ -67,7 +67,7 @@ class UniformRandomModel(BaseModel):
 
     def generate(self, 
                  n_samples: int,
-                 output_dir: str = None,
+                 output_file: str = None,
                  keep_in_memory: bool = True):
         '''
         Generate new sequences with the trained model
@@ -77,8 +77,8 @@ class UniformRandomModel(BaseModel):
         n_samples: int
             How many samples to generate
 
-        ouput_dir: str
-            Location to save the output file to. Will not
+        ouput_file: str
+            Location to save the outputs to. Will not
             write results to file if None, default = None
 
         keep_in_memory: bool
@@ -116,8 +116,8 @@ class UniformRandomModel(BaseModel):
                 seqs.append(seq)
             avg_lh /= len(seq)
 
-            if output_dir is not None:
-                with open(os.path.join(output_dir, 'random.fasta'), "a") as file:
+            if output_file is not None:
+                with open(os.path.join(output_file, 'random.fasta'), "a") as file:
                     file.write(f'>{avg_lh}\n{seq}\n')
 
         return seqs

@@ -1,12 +1,13 @@
-from src.evaluation.statistics import DatasetStatistics
-from src.evaluation.similarity import SimilarityStats
-from src.data.loader import DataLoader
-from src.models.basemodel import BaseModel
 import logging
 import matplotlib.pyplot as plt
 from typing import Callable
 import numpy as np
 from tqdm import tqdm
+
+from genzyme.evaluation.dstatistics import DatasetStatistics
+from genzyme.evaluation.similarity import SimilarityStats
+from genzyme.data import DataLoader
+from genzyme.models import BaseModel
 
 logger = logging.Logger(__name__)
 

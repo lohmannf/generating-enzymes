@@ -2,7 +2,8 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-from src.models.sedd_utils.model import utils as mutils
+
+from genzyme.models.sedd_utils.model import utils as mutils
 
 
 def get_loss_fn(noise, graph, train, sampling_eps=1e-3, lv=False, ltype = "dwdse"):

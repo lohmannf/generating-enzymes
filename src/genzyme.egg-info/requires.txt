@@ -1,0 +1,8 @@
+pandas
+mavenn
+torch
+datasets
+moviepy
+transformers
+pytorch-minimize
+blosum

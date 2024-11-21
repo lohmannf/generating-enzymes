@@ -1,10 +1,10 @@
-from src.models.factory import modelFactory
-
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from scipy.stats import contingency, chi2_contingency
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
+
+from genzyme.models import modelFactory
 
 class CovarianceStats:
 
@@ -74,15 +74,14 @@ class CovarianceStats:
         data = data.T # position x sequence
 
         cont = contingency.crosstab(data)[1]
-        S = np.ones((l,l))
-        P = np.ones((l,l))
+        S = np.zeros((l,l))
+        P = np.zeros((l,l), dtype=bool)
         for i in range(l-1):
             for j in range(i+1,l):
                 cont = contingency.crosstab(data[i], data[j])[1]
                 # remedy sparsity of contingency table
                 cont = cont[np.any(cont > 0, axis=1)]
                 cont = cont[:, np.any(cont > 0, axis=0)]
-                print(cont.shape)
                 res = chi2_contingency(cont)
 
                 S[i, j] = res[0]
@@ -94,7 +93,7 @@ class CovarianceStats:
         self.pvalue_maps[name] = P
 
     
-    def plot_map(self, name: str, map_type: str = "contact"):
+    def plot_map(self, name: str, map_type: str = "contact", filter_ns: bool = True):
         '''
         Plot the internally saved map of model name and type map_type
 
@@ -116,8 +115,14 @@ class CovarianceStats:
         fig, ax = plt.subplots(layout="constrained")
         if map_type == "contact":
             im = ax.imshow(self.cms[name], cmap="viridis")
+
         elif map_type == "chi":
-            im = ax.imshow(self.chi_maps[name])
+            dat = self.chi_maps[name]
+            print(self.pvalue_maps[name])
+            if filter_ns:
+                dat[~self.pvalue_maps[name]] = 0.
+            im = ax.imshow(dat)
+
         elif map_type == "pvalue":
             im = ax.imshow(self.pvalue_maps[name])
         else:
@@ -225,8 +230,8 @@ class CovarianceStats:
 
 if __name__ == "__main__":
 
-    from src.data.loader import loaderFactory
-    from src.data.utils import AA_DICT
+    from genzyme.data import loaderFactory
+    from genzyme.data.utils import AA_DICT
 
 
     res_dirs = {
@@ -244,8 +249,19 @@ if __name__ == "__main__":
     #"potts": "./potts/potts.fasta"
     }
 
-    stats = CovarianceStats(290)
+    res_dirs = {
+            "sedd": "./gen_data/mid1/sedd/mid1.fasta",
+            "dfm": "./gen_data/mid1/dfm/mid1.fasta",
+            "frozen": "./gen_data/mid1/zymctrl/frozen.fasta",
+            "pretrained": "./gen_data/mid1/zymctrl/zymctrl_pretrained.fasta",
+            "ft lr 8e-05": "./gen_data/mid1/zymctrl/zymctrl_lr_8e-05.fasta",
+            "random": "./gen_data/mid1/random/random_uninformed.fasta",
+            "random informed": "./gen_data/mid1/random/random_informed.fasta",
+            }
+    
     n_seqs = 1000
+    length = 97
+    stats = CovarianceStats(length)
 
     for name, path in res_dirs.items():
         
@@ -253,7 +269,7 @@ if __name__ == "__main__":
 
         gen_dat.load('fasta', path = path, replace = {'[UNK]':''})
         gen_dat.set_data(np.array([''.join([pos for pos in seq if pos in AA_DICT.keys()]) for seq in gen_dat.get_data()]))
-        gen_dat.unify_seq_len(290)
+        gen_dat.unify_seq_len(length)
 
         print(name, len(gen_dat.get_data()))
         #gen_dat.set_data(np.random.choice(gen_dat.get_data(), 1000, replace=False) if n_seqs < len(gen_dat.get_data()) else gen_dat.get_data())
@@ -263,22 +279,23 @@ if __name__ == "__main__":
         stats.add_chi_map(name, gen_dat)
         stats.plot_map(name, map_type="chi")
         plt.show()
-        plt.savefig(f'am_{name}.png', dpi=500)
+        plt.savefig(f'am_{name}_mid1.png', dpi=500)
         plt.close()
         
 
     res_dirs["train data"] = ""
     train_data = loaderFactory("potts")
-    train_data.load("ired")
-    train_data._replace("*")
-    train_data.unify_seq_len(290)
+    # train_data.load("ired", replace_ast = True)
+    # train_data._replace("*")
+    # train_data.unify_seq_len(290)
+    train_data.load("mid1")
     #train_data.set_data(np.random.choice(train_data.get_data(), n_seqs, replace=False))
     #train_data.set_data(np.random.choice(train_data.get_data(), 50, replace=False) if n_seqs < len(train_data.get_data()) else train_data.get_data())
     #stats.add_contact_map("train data", train_data)
     stats.add_chi_map("train data", train_data)
     stats.plot_map("train data", map_type="chi")
     plt.show()
-    plt.savefig('am_train.png', dpi=500)
+    plt.savefig('am_train_mid1.png', dpi=500)
     plt.close()
     
     

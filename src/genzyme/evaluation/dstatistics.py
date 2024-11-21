@@ -1,4 +1,3 @@
-from src.data.loader import DataLoader
 import matplotlib.pyplot as plt
 import logging
 from scipy.stats import mannwhitneyu, gaussian_kde
@@ -6,7 +5,9 @@ from scipy.stats.mstats import chisquare
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-import seaborn as sns
+from seaborn import heatmap
+
+from genzyme.data import DataLoader
 
 logger = logging.Logger(__name__)
 
@@ -221,6 +222,56 @@ class DatasetStatistics:
         ax.legend()
 
         return ax, hm_real, hm_gen
+    
+
+    def n_mutations_ppos(self, normalize = True):
+        '''
+        Make a barplot of the number of mutations per position
+        '''
+
+        ref = np.array(list(self.real.reference))
+        self.gen.unify_seq_len(len(ref))
+
+        data = np.array([list(x) for x in self.gen.get_data()])
+
+        mut_ppos = np.sum((data != ref), axis=0)
+        if normalize:
+            mut_ppos /= self.gen.length
+
+        fig, ax = plt.subplots(layout = "constrained")
+        ax.bar(range(len(mut_ppos)), mut_ppos)
+
+        ax.set_xlabel("sequence position")
+
+        if normalize:
+            ax.set_ylabel("pct mutated")
+        else:
+            ax.set_ylabel("# mutated")
+
+        return fig, ax
+
+
+    def n_mutations(self):
+        '''
+        Make histogram of the total number of mutations per sequence
+        '''
+
+        ref = np.array(list(self.real.reference))
+        self.gen.unify_seq_len(len(ref))
+
+        data = np.array([list(x) for x in self.gen.get_data()])
+
+        mut = np.sum((data != ref), axis=1)
+
+        n_bins = (max(mut)+1) - min(mut)
+
+        fig, ax = plt.subplots(layout = "constrained")
+        ax.hist(mut, bins=n_bins, range=(min(mut), max(mut)+1))
+
+        ax.set_ylabel("# sequences")
+        ax.set_xlabel("# mutations")
+
+        return fig, ax
 
 
     def aa_position_heatmap(self):
@@ -239,13 +290,13 @@ class DatasetStatistics:
         fig, axs = plt.subplots(nrows=1, ncols=3, layout='tight', figsize=[8, 12], width_ratios = [10,10,1])
 
         axs[0].tick_params(axis='both', which='major', labelsize=8)
-        sns.heatmap(hm_real, xticklabels= True, yticklabels = 'auto', ax=axs[0], cbar_ax = axs[2])
+        heatmap(hm_real, xticklabels= True, yticklabels = 'auto', ax=axs[0], cbar_ax = axs[2])
         axs[0].set_xlabel('Amino acid')
         axs[0].set_ylabel('Sequence position')
         axs[0].set_title(f'Real ({len(self.real.get_data())})')
 
         axs[1].tick_params(axis='both', which='major', labelsize=8)
-        sns.heatmap(hm_gen, xticklabels = True, yticklabels = False, ax=axs[1], cbar_ax = axs[2])
+        heatmap(hm_gen, xticklabels = True, yticklabels = False, ax=axs[1], cbar_ax = axs[2])
         labs = axs[0].get_yticklabels()
         pos = axs[0].get_yticks()
         axs[1].set_yticks(pos, labs)

@@ -6,13 +6,12 @@ import os
 import itertools
 import torch
 
-from src.data.loader import DataLoader
-
+from genzyme.data import DataLoader
+from genzyme.evaluation.weighted_hamming_kernel import weighted_hamming_kernel
 
 from mutedpy.protein_learning.kernels.hamming_kernel import hamming_kernel
 from mutedpy.protein_learning.kernels.onehot_kernel import onehot_kernel
 from mutedpy.protein_learning.kernels.blosum_kernel import blosum_kernel
-from src.evaluation.weighted_hamming_kernel import weighted_hamming_kernel
 
 class SimilarityStats():
 

@@ -9,7 +9,7 @@ from typing import Callable
 import torch
 from torch.utils.data import DataLoader as TorchDL, DistributedSampler, TensorDataset
 
-from src.data.utils import SpecialTokens, aa2int_single, aa2int
+from genzyme.data.utils import SpecialTokens, aa2int_single, aa2int
 
 class DataLoader():
     '''
@@ -18,7 +18,7 @@ class DataLoader():
     Extend with new class for every model type
     '''
 
-    DATASETS = ['gb1', 'ired', 'fasta', "entropy"]
+    DATASETS = ['gb1', 'ired', 'mid1', 'fasta', 'entropy']
 
     def __init__(self, seed: int = 31):
         self.data = None
@@ -100,8 +100,11 @@ class DataLoader():
         elif dataset == "entropy":
             self._load_entropy(**kwargs)
 
+        elif dataset =="mid1":
+            self._load_mid1(**kwargs)
+
         else:
-            raise ValueError(f"Unknown dataset, must be one of {DataLoader.DATASETS}")
+            raise NotImplementedError(f"Unknown dataset, must be one of {DataLoader.DATASETS}")
 
     
     def _load_gb1(self):
@@ -111,7 +114,7 @@ class DataLoader():
         self.data =  mavenn.load_example_dataset("gb1").x.to_numpy()
 
 
-    def _load_ired(self, rel_path: str = "/../../data/IRed/srired_active_data.csv", remove_ast: bool = False):
+    def _load_ired(self, rel_path: str = "./../../../data/IRed/srired_active_data.csv", remove_ast: bool = False):
         ''' 
         Loads the Imine Reductase dataset from Gantz et al., 2024
         Uses only active sequences
@@ -129,7 +132,7 @@ class DataLoader():
         None
         '''
         
-        path = os.path.dirname(__file__) + rel_path
+        path = os.path.join(os.path.dirname(__file__), rel_path)
         raw_data = pd.read_csv(path)
         self.data = raw_data.aa_seq.to_numpy()
         self.len_strategy = "median"
@@ -144,6 +147,41 @@ class DataLoader():
             self._replace("*")
 
     
+    def _load_mid1(self, round: int = 2, sort_split: int = 1, rel_path: str = "./../../../data/MID1/mid_filtered.csv"):
+        ''' 
+        Loads the MID1 dataset
+  
+        Parameters
+        -----------
+        round: int 
+            Which round to load. Must be one of [1, 2], default = 2
+        
+        sort_split: int
+            Which sorting split to load. Lower splits contain higher ones.
+            Must be one of [0,1,2], default = 1. 0 loads all the data in the round.
+
+        rel_path: str
+            The path to the csv file containing the data relative to loader.py
+        
+        Returns
+        -------
+        None
+        '''
+        
+        path = os.path.join(os.path.dirname(__file__), rel_path)
+        raw_data = pd.read_csv(path, index_col=0)
+
+        self.reference = "GSGSPLAQQIKNTLTFIGQANAAGRMDEVRTLQQNLHPLWAEYFQQTEGSGGSPLAQQIQYGHVLIHQARAAGRMDEVRRLSENTLQLMKEYFQQSD"
+
+        if round not in [1,2]:
+            raise NotImplementedError(f"Unknown round {round}")
+
+        try:
+            self.data = raw_data[(raw_data["round"] == round) & raw_data[str(sort_split)]].sequences.to_numpy()
+        except KeyError as e:
+            raise KeyError(f"Unknown sorting split {sort_split}")
+        
+
     def _load_fasta(self, path: str, 
                     replace: dict = {},
                     append: bool = False, 
@@ -214,7 +252,7 @@ class DataLoader():
         for tok, repl in replace.items():
             self._replace(tok, repl)
 
-    def _load_entropy(self, rel_path: str = "../../gen_data/scheduled_entropy/random.fasta"):
+    def _load_entropy(self, rel_path: str = "../../data/scheduled_entropy/random.fasta"):
 
         path = os.path.join(os.path.dirname(__file__), rel_path)
         DataLoader._load_fasta(self, path = path)

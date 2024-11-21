@@ -26,6 +26,7 @@ class GenerateSeqCallback(TrainerCallback):
         self.n_batches = n_batches
 
         self.step_count = 0
+        
 
     def on_step_end(self, 
                     args: TrainingArguments, 

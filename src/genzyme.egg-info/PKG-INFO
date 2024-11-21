@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: genzyme
+Version: 0.0.1
+Summary: Generative models for enzyme sequence design
+Home-page: https://github.com/lohmannf/generating-enzymes
+Author: Frederieke Lohmann
+Author-email: flohmann@ethz.ch
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.11

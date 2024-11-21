@@ -22,25 +22,21 @@ import wandb
 from datasets import Dataset, load_from_disk
 from omegaconf import DictConfig, OmegaConf
 
-from src.models.basemodel import BaseModel
-from src.data.utils import SpecialTokens
-from src.models.utils import GenerateSeqCallback
+from genzyme.models.basemodel import BaseModel
+from genzyme.data.utils import SpecialTokens
+from genzyme.models.utils import GenerateSeqCallback
 
 logger = logging.getLogger(__name__)
 
 class ZymCTRL(BaseModel):
     '''Wrapper for the ZymCTRL model by Mundsamey et al., 2024'''
 
-    def __init__(self, model_dir: str = './../../data/ZymCTRL', seed: int = 31):
+    def __init__(self, cfg: DictConfig):
         '''
         Parameters
         ----------
-        model_dir: str
-            The path to the pretrained model. Can be relative to file (start with ./)
-            or absolute path, default = './../../data/ZymCTRL'
-
-        seed: int
-            Random seed passed to set_seed
+        cfg: DictConfig
+            Dict-style config providing model dir and seed
 
 
         Returns
@@ -48,12 +44,12 @@ class ZymCTRL(BaseModel):
         ZymCTRL instance
         '''
         
-        if model_dir.startswith('./'):
+        if cfg.model.dir.startswith('./'):
             # path is relative to current file
-            self.model_dir = os.path.join(os.path.dirname(__file__), model_dir)
+            self.model_dir = os.path.join(os.path.dirname(__file__), cfg.model.dir)
 
         else:
-            self.model_dir = model_dir
+            self.model_dir = cfg.model.dir
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir)
@@ -64,7 +60,7 @@ class ZymCTRL(BaseModel):
             pass
 
         self.special = SpecialTokens("<start>", "<end>", "<pad>", "<|endoftext|>", "<sep>", " ", "[UNK]")
-        self.seed = seed
+        self.seed = cfg.model.seed
         
         set_seed(self.seed)
 
@@ -87,17 +83,17 @@ class ZymCTRL(BaseModel):
         '''
         
         # logger setup
-        log_level = logging.__dict__[log_level.upper()]
+        log_level = logging.__dict__[cfg.training.log_level.upper()]
         logger.setLevel(log_level)
         datasets.utils.logging.set_verbosity(log_level)
         transformers.utils.logging.set_verbosity(log_level)
 
         # detect any checkpoints
-        if cfg.ckpt is None and cfg.ckpt_dir is not None:
-            cfg.ckpt = get_last_checkpoint(cfg.ckpt_dir)
+        if cfg.training.ckpt is None and cfg.training.ckpt_dir is not None:
+            cfg.training.ckpt = get_last_checkpoint(cfg.training.ckpt_dir)
             
-        if cfg.ckpt:
-            logger.info(f'Resuming training at {cfg.ckpt}')
+        if cfg.training.ckpt:
+            logger.info(f'Resuming training at {cfg.training.ckpt}')
 
         # get the data if it's stored on disk
         if isinstance(train_dataset, str):
@@ -108,14 +104,18 @@ class ZymCTRL(BaseModel):
 
         # instantiate the tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir, 
-                                                           cache_dir=cfg.cache_dir, 
+                                                           cache_dir=cfg.training.cache_dir, 
                                                            use_auth_token=None)
         
         # instantiate the model
-        config = GPT2Config.from_json_file(self.model_dir+'/config.json')
-        config.update({'cache_dir': cfg.cache_dir,
+        try:
+            config = GPT2Config.from_json_file(self.model_dir+'/config.json')
+        except FileNotFoundError:
+            config = GPT2Config.from_pretrained(self.model_dir)
+
+        config.update({'cache_dir': cfg.training.cache_dir,
                        'use_auth_token': None,
-                       'tie_word_embeddings': not cfg.freeze})
+                       'tie_word_embeddings': not cfg.training.freeze})
 
         try:
             self.model = AutoModelForCausalLM.from_pretrained(self.model_dir, 
@@ -126,7 +126,7 @@ class ZymCTRL(BaseModel):
             self.model = AutoModelForCausalLM.from_config(config)
 
         
-        if cfg.freeze:
+        if cfg.training.freeze:
             for k,v in self.model.named_parameters():
                 if k.startswith('transformer'):
                     v.requires_grad = False
@@ -186,8 +186,10 @@ class ZymCTRL(BaseModel):
         
         logger.info("Running training")
 
-        result = trainer.train(resume_from_checkpoint = cfg.ckpt)
+        result = trainer.train(resume_from_checkpoint = cfg.training.ckpt)
         trainer.save_model()
+
+        OmegaConf.save(cfg, f = os.path.join(cfg.training.work_dir, "train_config.yaml"), resolve = True)
 
         metrics = result.metrics
         metrics["train_samples"] = len(train_dataset)

@@ -7,8 +7,8 @@ from torch.distributions import OneHotCategorical
 from typing import Callable
 from omegaconf import DictConfig
 
-from src.data.utils import onehot2aa
-from src.data import ProteinTokenizer
+from genzyme.data.utils import onehot2aa
+from genzyme.data import ProteinTokenizer
 
 class EnergyBasedModel(abc.ABC, torch.nn.Module):
     '''
@@ -27,6 +27,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
         self.L = L
         self.d = d
         self.tokenizer = ProteinTokenizer(has_sep=False)
+        self.projector = lambda x, is_onehot: x
 
     @abc.abstractmethod
     def forward(self):
@@ -140,7 +141,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
 
 
     def generate(self,
-                 gen_cfg: DictConfig,
+                 cfg: DictConfig,
                  x0: torch.Tensor = None
                 ):
         ''' 
@@ -149,7 +150,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
 
         Parameters
         ----------
-        gen_cfg: DictConfig
+        cfg: DictConfig
             Dict-style config containing all the generation hyperparameters
         
         x0: torch.Tensor
@@ -159,7 +160,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
         Returns
         -------
         seqs: list
-            The generated sequences, will be empty if gen_cfg.keep_in_memory = False
+            The generated sequences, will be empty if cfg.generation.keep_in_memory = False
         '''
 
         is_training = self.training
@@ -167,7 +168,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
         for p in self.parameters():
             p.requires_grad = False
 
-        self.set_seed(gen_cfg.seed)
+        self.set_seed(cfg.generation.seed)
 
         if x0 is None:
             x0 = self.get_random_seq()
@@ -178,10 +179,10 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
         x_curr = x0.detach()
         ct = 0
 
-        for i in tqdm(range(gen_cfg.n_burnin + gen_cfg.n_episodes)):
+        for i in tqdm(range(cfg.generation.n_burnin + cfg.generation.n_episodes)):
 
-            if gen_cfg.sampler == "local":
-                forward_delta = self.diff(x_curr, gen_cfg.temp_proposal)
+            if cfg.generation.sampler == "local":
+                forward_delta = self.diff(x_curr, cfg.generation.temp_proposal)
                 # make sure we dont choose to stay where we are!
                 forward_logits = forward_delta - 1e9 * x_curr
                 # flatten to only sample a single change
@@ -195,44 +196,44 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
                 changed_ind = changes_r.sum(-1)
                 # mask out changed dim and add in the change
                 x_delta = x_curr.clone() * (1. - changed_ind[:, :, None]) + changes_r
-                reverse_delta = self.diff(x_delta, gen_cfg.temp_proposal)
+                reverse_delta = self.diff(x_delta, cfg.generation.temp_proposal)
                 reverse_logits = reverse_delta - 1e9 * x_delta
                 cd_reverse = OneHotCategorical(logits=reverse_logits.view(x_delta.size(0), -1))
                 reverse_changes = x_curr * changed_ind[:, :, None]
 
                 lp_reverse = cd_reverse.log_prob(reverse_changes.view(x_delta.size(0), -1))
 
-                m_term = (self(x_delta.long()).squeeze() - self(x_curr.long()).squeeze()) / gen_cfg.temp_marginal
+                m_term = (self(self.projector(x_delta)).squeeze() - self(self.projector(x_curr)).squeeze()) / cfg.generation.temp_marginal
                 la = m_term + lp_reverse - lp_forward
                 print(m_term, lp_reverse, lp_forward, la, flush=True)
 
-            elif gen_cfg.sampler == "uniform":
+            elif cfg.generation.sampler == "uniform":
                 _, x_p = self.sample_H1(x_curr)
 
-                la = (self(x_p).squeeze()-self(x_curr).squeeze()) / gen_cfg.temp_marginal
+                la = (self(self.projector(x_p)).squeeze()-self(self.projector(x_curr)).squeeze()) / cfg.generation.temp_marginal
 
                 print(f'Acceptance log-probability: {la}')
 
             else:
-                raise NotImplementedError(f"Unknown sampler {gen_cfg.sampler}")
+                raise NotImplementedError(f"Unknown sampler {cfg.generation.sampler}")
             
             accept = (la.exp() > torch.rand_like(la)).float()
             print('Accepted' if accept else 'Rejected', flush=True)
             if not accept.any():
                 continue
 
-            if gen_cfg.sampler == "local":
+            if cfg.generation.sampler == "local":
                 x_p = (x_delta * accept[:, None, None] + x_curr * (1. - accept[:, None, None])).detach()
             
-            if i >= gen_cfg.n_burnin:
+            if i >= cfg.generation.n_burnin:
 
                 ct += 1
                 buf.append(torch.argmax(x_p.squeeze(), -1).detach().cpu())
-                if gen_cfg.keep_in_memory:
+                if cfg.generation.keep_in_memory:
                     x.append(torch.argmax(x_p.squeeze(), -1).detach().cpu())
                 
-                if len(buf) == gen_cfg.batch_sz:
-                    with open(gen_cfg.output_file, "a") as file:
+                if len(buf) == cfg.generation.batch_size:
+                    with open(cfg.generation.output_file, "a") as file:
                         print(buf[0].size())
                         print(torch.stack(buf).size())
                         for seq in self.tokenizer.batch_decode(torch.stack(buf)):
@@ -240,15 +241,16 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
                     buf = []
 
             x_curr = x_p
-
-        with open(gen_cfg.output_file, "a") as file:
-            for seq in self.tokenizer.batch_decode(torch.stack(buf)):
-                file.write(f'>\n{seq}\n')
+        
+        if len(buf) > 0:
+            with open(cfg.generation.output_file, "a") as file:
+                for seq in self.tokenizer.batch_decode(torch.stack(buf)):
+                    file.write(f'>\n{seq}\n')
 
         if len(x) > 0:
             x = self.tokenizer.batch_decode(torch.stack(x))
 
-        print(f"Generated {ct} sequences\nAcceptance rate: {np.round(ct / gen_cfg.n_episodes, 3)}")
+        print(f"Generated {ct} sequences\nAcceptance rate: {np.round(ct / cfg.generation.n_episodes, 3)}")
 
         self.train(is_training)
         for p in self.parameters():
