@@ -5,7 +5,7 @@ model: small
 
 wandb:
   entity: flohmann
-  project: sedd
+  project: diffusion
 
 training:
   loss: dwdse
@@ -24,9 +24,7 @@ training:
 data:
   test_split: 0.2
   grouped: true
-  train: protein
-  valid: protein
-  name: ired
+  name:  ired
   cache_dir: data
 
 graph:

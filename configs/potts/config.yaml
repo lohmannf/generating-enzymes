@@ -9,7 +9,8 @@ model:
 training:
   alpha: 0.01
   n_epochs: 5000
-  batch_size: 32 # effective batch size is batch_size*20
+  batch_size: 32
+  test_split: 0.2
   log_freq: 5 #epochs
   contact_map_snapshot_freq: 500
 
@@ -24,13 +25,13 @@ training:
 
     # parameters for l-bfgs
     history_size: 15
+    max_iter: 8000
 
   use_wandb: true
   wandb:
     project: potts
 
-  work_dir: /cluster/project/krause/flohmann/potts_${..training.freeze}_lr_${..training.optimizer.lr}_acc_${..training.optimizer.accum}/
-
+  work_dir: /cluster/project/krause/flohmann/potts_${..training.optimizer.method}/
 
 
 generation:
@@ -41,5 +42,5 @@ generation:
   n_episodes: 10000
   n_burnin: 10000 
   batch_size: 100 # batch size for writing to disk
-  keep_in_memory: true
+  keep_in_memory: false
   output_file: ${..training.work_dir}/potts.fasta

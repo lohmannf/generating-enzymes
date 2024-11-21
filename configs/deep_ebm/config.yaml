@@ -16,6 +16,7 @@ training:
   snapshot_freq: 50
   freeze: true
   chunk_sz: 3 # number seq positions handled in the same chunk
+  ckpt: null
 
   optimizer:
     lr: 8e-5
@@ -40,7 +41,7 @@ generation:
   n_episodes: 10000
   n_burnin: 10000 
   batch_size: 100 # batch size for writing to disk
-  keep_in_memory: true
+  keep_in_memory: false
   output_file: ${..training.work_dir}/deep_ebm.fasta
 
 
