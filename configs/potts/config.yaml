@@ -24,7 +24,7 @@ training:
     lr_limit: 0.001
 
     # parameters for l-bfgs
-    history_size: 15
+    history_size: 20
     max_iter: 8000
 
   use_wandb: true
@@ -32,6 +32,9 @@ training:
     project: potts
 
   work_dir: /cluster/project/krause/flohmann/potts_${..training.optimizer.method}/
+
+data:
+  name: "ired"
 
 
 generation:

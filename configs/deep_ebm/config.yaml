@@ -8,6 +8,7 @@ model:
     path: /cluster/project/krause/flohmann/esm2_t12_35M_UR50D
 
 training:
+  split: 0.1
   n_steps: 100000
   n_epochs: null
   batch_size: 32 # effective batch size is batch_size*20
