@@ -200,4 +200,6 @@ if __name__ == "__main__":
     data2["round"] = 2
 
     data = pd.concat([data1, data2], axis=0, ignore_index=True)
+
+    os.makedirs("../data/MID1", exist_ok = True)
     data.to_csv("../data/MID1/mid_filtered.csv")
