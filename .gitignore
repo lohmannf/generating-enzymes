@@ -10,3 +10,4 @@ gen_data
 datasets
 datasets_unlabelled
 wandb
+notebooks/model_training_generation.ipynb
