@@ -6,45 +6,7 @@ from genzyme.evaluation.utils import compare_histograms
 from genzyme.data import loaderFactory
 
 
-def main(args):
-
-    if args.dataset == "ired":
-        res_dirs = {
-            "sedd": "./gen_data/sedd/ired.fasta",
-            "dfm": "./gen_data/dfm/ired.fasta",
-            "frozen": "./gen_data/frozen/1.5.1.-.fasta",
-            "pretrained": "./gen_data/zymCTRL_results/1.5.1.-.fasta",
-            "tiny": "./gen_data/tiny_model/1.5.1.-.fasta",
-            #"small": "./gen_data/small_model/1.5.1.-.fasta",
-            "ft lr 8e-05": "./gen_data/zytune_untrunc/1.5.1.-.fasta",
-            "ft lr 8e-06": "./gen_data/zymctrl_lr-06/1.5.1.-.fasta",
-            "ft lr 8e-07": "./gen_data/zymctrl_lr-07/1.5.1.-.fasta",
-            "ft lr 8e-08": "./gen_data/zymctrl_lr-08/1.5.1.-.fasta",
-            "ft lr 8e-09": "./gen_data/zymctrl_lr-09/1.5.1.-.fasta",
-            "potts gwg": "./gen_data/potts_adam_gwg_T_0.01_lr_0.001_unified.fasta",
-            #"deep ebm": "./gen_data/deep_ebm/frozen_seed_31_gwg_T_100/potts.fasta",
-            #"potts uniform": "./gen_data/potts_uniform_T_0.01_unified.fasta",
-            #"random": "./gen_data/random.fasta",
-            "random informed": "./gen_data/random_trained.fasta",
-            }
-    
-    elif args.dataset == "mid1":
-        res_dirs = {
-            "sedd": "./gen_data/mid1/sedd/mid1.fasta",
-            "dfm": "./gen_data/mid1/dfm/mid1.fasta",
-            "frozen": "./gen_data/mid1/zymctrl/frozen.fasta",
-            "pretrained": "./gen_data/mid1/zymctrl/zymctrl_pretrained.fasta",
-            "ft lr 8e-05": "./gen_data/mid1/zymctrl/zymctrl_lr_8e-05.fasta",
-            "deep ebm T=5": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_5.fasta",
-            "deep ebm T=10": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_10.fasta",
-            "potts gwg T=0.01": "./gen_data/mid1/potts/frozen_seed_31_local_T_0.01.fasta",
-            "potts gwg T=1": "./gen_data/mid1/potts/frozen_seed_31_local_T_1.fasta",
-            "random": "./gen_data/mid1/random/random_uninformed.fasta",
-            "random informed": "./gen_data/mid1/random/random_informed.fasta",
-            }
-        
-    else:
-        raise NotImplementedError
+def main(args, res_dirs):
 
     # TVD Computation #########################
 
@@ -85,7 +47,7 @@ def main(args):
 
             # get TVD to reference for all similarity metrics
             print(c_name, r_name)
-            bins = [3,20,30,3]
+            bins = [3,20,30,3] ## Modify this if the results are weird
             tvd[(ref, curr)] = compare_histograms(gen_dat, y, sim_ref, n_bins = bins, subsample_gen = not args.use_wildtype, n_samples = 1000)
 
         if args.use_wildtype:
@@ -134,4 +96,43 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", default = "ired", help="Name of the dataset")
 
     args = parser.parse_args()
-    main(args)
+
+    if args.dataset == "ired":
+        res_dirs = {
+            "sedd": "./gen_data/sedd/ired.fasta",
+            "dfm": "./gen_data/dfm/ired.fasta",
+            "frozen": "./gen_data/frozen/1.5.1.-.fasta",
+            "pretrained": "./gen_data/zymCTRL_results/1.5.1.-.fasta",
+            "tiny": "./gen_data/tiny_model/1.5.1.-.fasta",
+            #"small": "./gen_data/small_model/1.5.1.-.fasta",
+            "ft lr 8e-05": "./gen_data/zytune_untrunc/1.5.1.-.fasta",
+            "ft lr 8e-06": "./gen_data/zymctrl_lr-06/1.5.1.-.fasta",
+            "ft lr 8e-07": "./gen_data/zymctrl_lr-07/1.5.1.-.fasta",
+            "ft lr 8e-08": "./gen_data/zymctrl_lr-08/1.5.1.-.fasta",
+            "ft lr 8e-09": "./gen_data/zymctrl_lr-09/1.5.1.-.fasta",
+            "potts gwg": "./gen_data/potts_adam_gwg_T_0.01_lr_0.001_unified.fasta",
+            #"deep ebm": "./gen_data/deep_ebm/frozen_seed_31_gwg_T_100/potts.fasta",
+            #"potts uniform": "./gen_data/potts_uniform_T_0.01_unified.fasta",
+            #"random": "./gen_data/random.fasta",
+            "random informed": "./gen_data/random_trained.fasta",
+            }
+    
+    elif args.dataset == "mid1":
+        res_dirs = {
+            "sedd": "./gen_data/mid1/sedd/mid1.fasta",
+            "dfm": "./gen_data/mid1/dfm/mid1.fasta",
+            "frozen": "./gen_data/mid1/zymctrl/frozen.fasta",
+            "pretrained": "./gen_data/mid1/zymctrl/zymctrl_pretrained.fasta",
+            "ft lr 8e-05": "./gen_data/mid1/zymctrl/zymctrl_lr_8e-05.fasta",
+            "deep ebm T=5": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_5.fasta",
+            "deep ebm T=10": "./gen_data/mid1/deep_ebm/frozen_seed_31_uniform_T_10.fasta",
+            "potts gwg T=0.01": "./gen_data/mid1/potts/frozen_seed_31_local_T_0.01.fasta",
+            "potts gwg T=1": "./gen_data/mid1/potts/frozen_seed_31_local_T_1.fasta",
+            "random": "./gen_data/mid1/random/random_uninformed.fasta",
+            "random informed": "./gen_data/mid1/random/random_informed.fasta",
+            }
+        
+    else:
+        raise NotImplementedError
+
+    main(args, res_dirs)

@@ -212,13 +212,13 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
 
                 la = (self(self.projector(x_p)).squeeze()-self(self.projector(x_curr)).squeeze()) / cfg.generation.temp_marginal
 
-                print(f'Acceptance log-probability: {la}')
+                #print(f'Acceptance log-probability: {la}')
 
             else:
                 raise NotImplementedError(f"Unknown sampler {cfg.generation.sampler}")
             
             accept = (la.exp() > torch.rand_like(la)).float()
-            print('Accepted' if accept else 'Rejected', flush=True)
+            #print('Accepted' if accept else 'Rejected', flush=True)
             if not accept.any():
                 continue
 

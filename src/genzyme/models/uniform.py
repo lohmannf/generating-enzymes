@@ -21,6 +21,7 @@ class UniformRandomModel(BaseModel):
         self.rng = np.random.default_rng()
         self.frequency = np.ones((length, len(AA_DICT)))/len(AA_DICT)
         self.freq_idx = np.array(list(AA_DICT.keys()))
+        self.l = length
 
     def pad_data(self, data: np.ndarray):
         '''Append padding tokens so that all sequences in data have the same length'''
@@ -28,11 +29,11 @@ class UniformRandomModel(BaseModel):
         lens = [len(seq) for seq in data]
         max_len = max(lens)
         
-        return [seq + (max_len - lens[i])*'$' for i, seq in enumerate(data)]
+        return np.ndarray([seq + (max_len - lens[i])*'$' for i, seq in enumerate(data)])
 
 
     def run_training(self,
-        train_dataset: str | np.ndarray, length: int):
+        train_dataset: str | np.ndarray):
         '''
         Learn the empirical marginal distribution of each position in the sequence
 
@@ -40,9 +41,6 @@ class UniformRandomModel(BaseModel):
         ----------
         train_dataset: str | np.ndarray
             The training sequences or the path to a file that stores them
-
-        length: int
-            Fixed length of the generated sequences
 
         Returns
         -------
@@ -56,7 +54,7 @@ class UniformRandomModel(BaseModel):
         freqs = pd.DataFrame()
         train_dataset = self.pad_data(train_dataset)
 
-        for pos in tqdm(range(length), desc = 'Learning positions'):
+        for pos in tqdm(range(self.l), desc = 'Learning positions'):
             aas = [seq[pos] for seq in train_dataset if len(seq) > pos]
             aa, cts = np.unique(aas, return_counts = True)
             freqs = pd.concat([freqs, pd.DataFrame([cts / sum(cts)], columns = aa)], ignore_index = True)
