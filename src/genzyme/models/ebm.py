@@ -27,7 +27,7 @@ class EnergyBasedModel(abc.ABC, torch.nn.Module):
         self.L = L
         self.d = d
         self.tokenizer = ProteinTokenizer(has_sep=False)
-        self.projector = lambda x, is_onehot: x
+        self.projector = lambda x, is_onehot = True: x
 
     @abc.abstractmethod
     def forward(self):

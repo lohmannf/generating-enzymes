@@ -29,7 +29,7 @@ class UniformRandomModel(BaseModel):
         lens = [len(seq) for seq in data]
         max_len = max(lens)
         
-        return np.ndarray([seq + (max_len - lens[i])*'$' for i, seq in enumerate(data)])
+        return np.array([seq + (max_len - lens[i])*'$' for i, seq in enumerate(data)])
 
 
     def run_training(self,
@@ -115,7 +115,7 @@ class UniformRandomModel(BaseModel):
             avg_lh /= len(seq)
 
             if output_file is not None:
-                with open(os.path.join(output_file, 'random.fasta'), "a") as file:
+                with open(output_file, "a") as file:
                     file.write(f'>{avg_lh}\n{seq}\n')
 
         return seqs

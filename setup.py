@@ -33,6 +33,9 @@ setup(
         "cycler",
         "scikit-learn",
         "fair-esm",
-        "pytorch-minimize"  
+        "pytorch-minimize",
+        "tf-keras",
+        "einops",
+        "flash_attn",
     ],
 )

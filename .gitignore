@@ -2,7 +2,6 @@
 .DS_Store
 enz_venv
 *slurm*
-data/IRed/srired_active_data.csv
 data/MID1/mid_filtered.csv
 data/ZymCTRL
 eval_plots

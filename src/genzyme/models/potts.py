@@ -27,6 +27,18 @@ class PottsModel(EnergyBasedModel, BaseModel):
 
         self.to(self.device)
 
+    def dump(self, file: str):
+        """Save the model to disk at the specified location"""
+        params = {"J": self.J, "h": self.h, "lambda_J": self.lambda_J, "lambda_h": self.lambda_h}
+        torch.save(params, file)
+    
+    def load(self, file: str):
+        params = torch.load(file)
+        self.J = params["J"]
+        self.h = params["h"]
+        self.lambda_J = params["lambda_J"]
+        self.lambda_h = params["lambda_h"]
+
     def pseudo_lh_param(self, params: torch.Tensor):
         '''
         Objective function for pytorch-minimize.
@@ -144,10 +156,10 @@ class PottsModel(EnergyBasedModel, BaseModel):
         """
 
         if not os.path.exists(cfg.training.work_dir):
-            os.mkdir(cfg.training.work_dir)
-            os.mkdir(os.path.join(cfg.training.work_dir, "snapshots"))
+            os.makedirs(cfg.training.work_dir, exist_ok=True)
+            os.makedirs(os.path.join(cfg.training.work_dir, "snapshots"), exist_ok=True)
 
-        OmegaConf.save(os.path.join(cfg.training.work_dir, "config.yaml"), resolve=True)
+        OmegaConf.save(cfg, os.path.join(cfg.training.work_dir, "config.yaml"), resolve=True)
 
         if cfg.training.optimizer.method == "l-bfgs":
             params = torch.randn(size = (self.L, self.L + 1, self.d, self.d)).double()

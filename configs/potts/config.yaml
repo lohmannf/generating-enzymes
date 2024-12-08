@@ -31,7 +31,7 @@ training:
   wandb:
     project: potts
 
-  work_dir: /cluster/project/krause/flohmann/potts_${..training.optimizer.method}/
+  work_dir: ./potts_${..training.optimizer.method}/
 
 data:
   name: "ired"
