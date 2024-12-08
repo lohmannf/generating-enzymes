@@ -1,27 +1,27 @@
 model:
-  L: 290
-  d: 20
-  mode: pseudolh
-  seed: 31
+  L: 290 # sequence length
+  d: 20 # number of amino acids
+  mode: pseudolh # mode for calculating the energy, one of [pseudolh, quadratic]
+  seed: 31 # random seed
   energy_model:
-    name: esm
-    path: facebook/esm2_t12_35M_UR50D
+    name: esm # DL model for calculating representations
+    path: facebook/esm2_t12_35M_UR50D # huggingface hub or local path to the model
 
 data:
-  name: ired
+  name: ired # dataset
 
 training:
-  split: 0.1
-  n_steps: 100000
-  n_epochs: null
+  split: 0.1 # fraction of data used for validation
+  n_steps: 100000 # number of iterations
+  n_epochs: null # number of epochs to train, will use minimum of n_steps and n_epochs to terminate
   batch_size: 32 # effective batch size is batch_size*20
-  val_batch_size: 32
+  val_batch_size: 32 
   log_freq: 32
   eval_freq: 50
   snapshot_freq: 50
-  freeze: true
+  freeze: true # whether to train the energy_model
   chunk_sz: 3 # number seq positions handled in the same chunk
-  ckpt: null
+  ckpt: null # path to checkpoint
 
   optimizer:
     lr: 8e-5
@@ -29,24 +29,24 @@ training:
     beta2: 0.999
     gamma: 1.  #scheduler gamma
     decay: 0.01
-    accum: 16
+    accum: 16 # how many batches are accumulated
     grad_clip: 1.
 
   use_wandb: true
-  wandb:
+  wandb: # wandb.init kwargs
     project: deep-ebm
 
   work_dir: /cluster/project/krause/flohmann/deep_ebm_f_${..training.freeze}_lr_${..training.optimizer.lr}_acc_${..training.optimizer.accum}/
 
 generation:
-  seed: ${..model.seed}
-  sampler: local
-  temp_proposal: 2.
-  temp_marginal: 1.
-  n_episodes: 10000
+  seed: ${..model.seed} # random seed for generation, change to run chain from different starting point
+  sampler: local # Sampling algorithm, must be one of [local, uniform]
+  temp_proposal: 2. # temperature on the proposal distribution term of the acceptance probability, has no effect if sampler = uniform
+  temp_marginal: 1. # temperature on the marginal term of the acceptance probability
+  n_episodes: 10000 
   n_burnin: 10000 
   batch_size: 100 # batch size for writing to disk
-  keep_in_memory: false
-  output_file: ${..training.work_dir}/deep_ebm.fasta
+  keep_in_memory: false # return generated sequences at the end of the run
+  output_file: ${..training.work_dir}/deep_ebm.fasta # location where results are saved
 
 

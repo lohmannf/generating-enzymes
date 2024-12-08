@@ -1,20 +1,20 @@
 model:
   dir: AI4PD/ZymCTRL #hf hub repo or local directory
-  seed: 31
-  name: zymctrl
+  seed: 31 # random seed
+  name: zymctrl # identification name of the model
 
 data:
-  name: mid1 #ired
-  tag: 3.1.-.- #1.5.1.-
-  reload: true
-  test_split: 0.1
+  name: mid1 #dataset name, e.g. ired or mid1
+  tag: 3.1.-.- # tag that is used to prepend the training data
+  reload: true # whether the dataset should be reloaded and reprocessed. set false if dataset is already stored on disk
+  test_split: 0.1 # fraction of data to use for validation
 
 training:
-  n_epochs: 10
-  freeze: true
-  train_batch_size: 1
+  n_epochs: 10 # max number of epochs
+  freeze: true # freeze model except the LM head
+  train_batch_size: 1 # effective batch size is bigger because the context length is 1048
   eval_batch_size: 4
-  log_freq: 5
+  log_freq: 5 
   log_level: info
   eval_freq: 10
   snapshot_freq: 100
@@ -31,7 +31,7 @@ training:
     kwargs: ${...generation.kwargs}
 
   use_wandb: true
-  wandb:
+  wandb: # wandb.init kwargs
     project: zymctrl
 
   optimizer:
